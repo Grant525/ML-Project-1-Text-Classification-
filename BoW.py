@@ -14,15 +14,16 @@ def load_data():
     data_dir = 'data_readinglevel'
     x_train_df = pd.read_csv(os.path.join(data_dir, 'x_train.csv'))
     y_train_df = pd.read_csv(os.path.join(data_dir, 'y_train.csv'))
+    x_test_df = pd.read_csv(os.path.join(data_dir, 'x_test.csv'))
 
-    N, n_cols = x_train_df.shape
+    # N, n_cols = x_train_df.shape
     # print("Shape of x_train_df: (%d, %d)" % (N, n_cols))
     # print("Shape of y_train_df: %s" % str(y_train_df.shape))
 
     # Print out 8 random entries
-    tr_text_list = x_train_df['text'].values.tolist()
-    prng = np.random.RandomState(101)
-    rows = prng.permutation(np.arange(y_train_df.shape[0]))
+    # tr_text_list = x_train_df['text'].values.tolist()
+    # prng = np.random.RandomState(101)
+    # rows = prng.permutation(np.arange(y_train_df.shape[0]))
     # for row_id in rows[:8]:
     #     text = tr_text_list[row_id]
     #     print("row %5d | %s BY %s | y = %s" % (
@@ -39,13 +40,13 @@ def load_data():
     #     print('\n'.join(line_list))
     #     print("")
 
-    return x_train_df, y_train_df
+    return x_train_df, y_train_df, x_test_df
 
 
 def hyperparameter_selection(x_train_df, y_train_df):
     #get text and target
     tr_list_of_text = x_train_df['text'].values.tolist()
-    y_labels = y_train_df["Coarse Label"].tolist()
+    y_labels = y_train_df['Coarse Label'].tolist()
 
     best_num_feats, best_max_df, best_min_df, max_auc, best_c = 100, 0, 0, 0, 0
     for num_feats in np.linspace(1000, 10000, 10, dtype=int).tolist() + [None]:
@@ -74,14 +75,14 @@ def hyperparameter_selection(x_train_df, y_train_df):
                 for c in np.logspace(-4, 4, 17):
                     auc_sum = 0
                     for train_ind, val_ind in kf.split(X_dev, y_dev):
-                        pipe = sklearn.linear_model.LogisticRegression(solver="liblinear", l1_ratio=1.0, C=c)
+                        pipe = sklearn.linear_model.LogisticRegression(solver='liblinear', l1_ratio=1.0, C=c)
                         pipe.fit(X_dev[train_ind], y_dev[train_ind])
                         y_hat = pipe.predict_proba(X_dev[val_ind])[:, 1]
                         auc = sklearn.metrics.roc_auc_score(y_dev[val_ind], y_hat)
                         auc_sum += auc
                     avg_auc = auc_sum / 10
 
-                    print(f"AUC {avg_auc:.6f} @ Max Feats {num_feats}, min_df {min_df}, max_df {max_df:.2f}, c {c:e} ")
+                    print(f"AUC {avg_auc:.6f} @ Max Feats {num_feats}, min_df {min_df}, max_df {max_df:.2f}, c {c:e}")
 
                     # Prioritize fewer features, then a lower c value
                     if avg_auc > max_auc:
@@ -106,9 +107,10 @@ def hyperparameter_selection(x_train_df, y_train_df):
 
     return best_c, best_num_feats, best_max_df, best_min_df
 
-def test_prediction(x_train_df, y_train_df, c, num_feats, max_df, min_df):
+def test_prediction(x_train_df, y_train_df, x_test_df, c, num_feats, max_df, min_df):
     tr_list_of_text = x_train_df['text'].values.tolist()
-    y_labels = y_train_df["Coarse Label"].tolist()
+    y_labels = y_train_df['Coarse Label'].tolist()
+    test_list_of_text = x_test_df['text'].values.tolist()
 
     vectorizer = CountVectorizer(
         lowercase=True,
@@ -122,14 +124,20 @@ def test_prediction(x_train_df, y_train_df, c, num_feats, max_df, min_df):
     X_dev = vectorizer.fit_transform(tr_list_of_text)
     pipe = sklearn.linear_model.LogisticRegression(solver="liblinear", l1_ratio=1.0, C=c)
     pipe.fit(X_dev, y_labels)
-    y_hat = pipe.predict_proba(X_dev)[:, 1]
+    X_test = vectorizer.transform(test_list_of_text)
+    y_hat = pipe.predict_proba(X_test)[:, 1]
     np.savetxt('yproba1_test.txt', y_hat)
 
 def main():
-    x_train_df, y_train_df = load_data()
-    c, num_feats, max_df, min_df = hyperparameter_selection(x_train_df, y_train_df)
+    x_train_df, y_train_df, x_test_df = load_data()
+    # c, num_feats, max_df, min_df = hyperparameter_selection(x_train_df, y_train_df)
     # best result: auc = 0.8213904877785245, c = 1.0, num_feats = None, max_df = 0.65, min_df = 2
-    test_prediction(x_train_df, y_train_df, c, num_feats, max_df, min_df)
+    auc = 0.8213904877785245
+    c = 1.0
+    num_feats = None
+    max_df = 0.65
+    min_df = 2
+    test_prediction(x_train_df, y_train_df, x_test_df, c, num_feats, max_df, min_df)
 
 if __name__ == "__main__":
     main()
