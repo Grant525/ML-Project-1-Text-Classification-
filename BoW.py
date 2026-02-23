@@ -50,8 +50,8 @@ def hyperparameter_selection(x_train_df, y_train_df):
 
     best_num_feats, best_max_df, best_min_df, max_auc, best_c, best_ngram = 100, 0, 0, 0, 0, (0, 0)
     # for num_feats in np.linspace(1000, 10000, 10, dtype=int).tolist() + [None]:
-    for num_feats in [10000, None]:
-        for ngram in [(1,1), (1,2), (2,2), (1,3), (2,3), (3,3)]:
+    for num_feats in [None]:
+        for ngram in [(1,1), (1,2), (1,3), (1,4)]:
             for min_df in np.linspace(1, 10, 10, dtype=int):
                 for max_df in np.linspace(0.1, 1, 19):
                     # Turn into vector, tokenize text, remove stop words, remove punctuation and non alphabet symbols 
