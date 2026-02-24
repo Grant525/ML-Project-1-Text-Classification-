@@ -104,3 +104,5 @@ for C in np.logspace(-4, 4, 17):
 
 print ("Best C:", best_c)
 print ("Best AUC:", max_auc)
+
+pipe = make_logit_pipeline_knnimpute(C= best_c)
