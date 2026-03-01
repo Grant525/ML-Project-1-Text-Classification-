@@ -123,21 +123,25 @@ def test_prediction(x_train_df, y_train_df, x_test_df, c, num_feats, max_df, min
         token_pattern=r'\b[a-z]+\b',
         stop_words='english',
         min_df=5,
-        max_df=.65,
+        max_df=.35,
         max_features=None,
         ngram_range=(1,1)
     )
 
+    print(pd.Series(y_labels).value_counts())
     X_dev = vectorizer.fit_transform(tr_list_of_text)
-    pipe = sklearn.linear_model.LogisticRegression(solver="liblinear", penalty="l1", C=0.1)
+    pipe = sklearn.linear_model.LogisticRegression(solver="liblinear", penalty="l2", C=.1)
     pipe.fit(X_dev, y_labels)
     X_test = vectorizer.transform(test_list_of_text)
     y_hat = pipe.predict_proba(X_test)[:, 1]
     np.savetxt('yproba1_test.txt', y_hat)
+    print("y_hat[:5]:", y_hat[:5])
+    print("Vocab size:", X_dev.shape)
+
 
 def main():
     x_train_df, y_train_df, x_test_df = load_data()
-    c, num_feats, max_df, min_df, ngram = hyperparameter_selection(x_train_df, y_train_df)
+    #c, num_feats, max_df, min_df, ngram = hyperparameter_selection(x_train_df, y_train_df)
     # best result: auc = 0.8213904877785245, c = 1.0, num_feats = None, max_df = 0.65, min_df = 2
     # auc = 0.8422606259957117
     # c = 3162.2776601683795
@@ -146,7 +150,7 @@ def main():
     # min_df = 1
     # ngram = (1, 3)
 
-    test_prediction(x_train_df, y_train_df, x_test_df, c, num_feats, max_df, min_df, ngram)
+    test_prediction(x_train_df, y_train_df, x_test_df, None, None, None, None, None)
 
 if __name__ == "__main__":
     main()
