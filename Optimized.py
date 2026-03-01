@@ -1,108 +1,150 @@
 import os
 import numpy as np
 import pandas as pd
-import re
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
-import textwrap
 import os
 
-
-import sklearn.preprocessing
-import sklearn.pipeline
 import sklearn.linear_model
 import sklearn.metrics
 import sklearn.model_selection
 from sklearn.feature_extraction.text import CountVectorizer
 
 from matplotlib import pyplot as plt
-
 import seaborn as sns
-from load_BERT_embeddings import load_arr_from_npz 
 
+import sklearn.neural_network
+import sklearn.pipeline
+import sklearn.preprocessing
 
+from load_BERT_embeddings import load_arr_from_npz
 
-if __name__ == '__main__':
+import warnings
+warnings.filterwarnings('ignore')
+
+RANDOM_SEED = 68
+
+# if __name__ == '__main__':
+#     data_dir = 'data_readinglevel'
+#     x_train_df = pd.read_csv(os.path.join(data_dir, 'x_train.csv'))
+#     y_train_df = pd.read_csv(os.path.join(data_dir, 'y_train.csv'))
+
+#     N, n_cols = x_train_df.shape
+#     print("Shape of x_train_df: (%d, %d)" % (N, n_cols))
+#     print("Shape of y_train_df: %s" % str(y_train_df.shape))
+
+#     # Print out 8 random entries
+#     tr_text_list = x_train_df['text'].values.tolist()
+#     prng = np.random.RandomState(101)
+#     rows = prng.permutation(np.arange(y_train_df.shape[0]))
+#     for row_id in rows[:8]:
+#         text = tr_text_list[row_id]
+#         print("row %5d | %s BY %s | y = %s" % (
+#             row_id,
+#             y_train_df['title'].values[row_id],
+#             y_train_df['author'].values[row_id],
+#             y_train_df['Coarse Label'].values[row_id],
+#             ))
+
+#         line_list = textwrap.wrap(tr_text_list[row_id],
+#             width=70,
+#             initial_indent='  ',
+#             subsequent_indent='  ')
+#         print('\n'.join(line_list))
+#         print("")
+
+def make_mlp_pipeline(layers, activation, solver, alpha, batch_size, learning_rate):
+    pipeline = sklearn.pipeline.Pipeline(
+        steps= [
+            ('rescaler', sklearn.preprocessing.MinMaxScaler()),
+            ('logit', sklearn.neural_network.MLPClassifier(hidden_layer_sizes=layers,
+                                                           activation=activation,
+                                                           solver=solver,
+                                                           alpha=alpha,
+                                                           batch_size=batch_size,
+                                                           learning_rate=learning_rate
+            ))
+        ]
+    )
+    return pipeline
+
+def load_data():
     data_dir = 'data_readinglevel'
+
+    # #get text and target
+    # tr_list_of_text = x_train_df['text'].values.tolist()
+    # y_labels = y_train_df["Coarse Label"].tolist()
+    # x_train = x_train_df.drop(columns = ["author", "title" , "passage_id", "text"])
+
     x_train_df = pd.read_csv(os.path.join(data_dir, 'x_train.csv'))
     y_train_df = pd.read_csv(os.path.join(data_dir, 'y_train.csv'))
 
-    N, n_cols = x_train_df.shape
-    print("Shape of x_train_df: (%d, %d)" % (N, n_cols))
-    print("Shape of y_train_df: %s" % str(y_train_df.shape))
+    x_train = load_arr_from_npz(os.path.join(
+        data_dir, 'x_train_BERT_embeddings.npz'))
 
-    # Print out 8 random entries
-    tr_text_list = x_train_df['text'].values.tolist()
-    prng = np.random.RandomState(101)
-    rows = prng.permutation(np.arange(y_train_df.shape[0]))
-    for row_id in rows[:8]:
-        text = tr_text_list[row_id]
-        print("row %5d | %s BY %s | y = %s" % (
-            row_id,
-            y_train_df['title'].values[row_id],
-            y_train_df['author'].values[row_id],
-            y_train_df['Coarse Label'].values[row_id],
-            ))
+    x_test = load_arr_from_npz(os.path.join( data_dir, 'x_test_BERT_embeddings.npz'))
 
-        line_list = textwrap.wrap(tr_text_list[row_id],
-            width=70,
-            initial_indent='  ',
-            subsequent_indent='  ')
-        print('\n'.join(line_list))
-        print("")
+    return x_train, x_train_df, y_train_df, x_test
 
 
-def make_logit_pipeline_knnimpute(C=1.0, k=5):
-    pipeline = sklearn.pipeline.Pipeline(
-        steps=[
-         #('imputer', sklearn.impute.SimpleImputer(missing_values=np.nan, strategy='mean')),
-         ('imputer', sklearn.impute.KNNImputer(n_neighbors=k)),
-         ('rescaler', sklearn.preprocessing.MinMaxScaler()),
-         ('logit', sklearn.linear_model.LogisticRegression(solver="lbfgs", l1_ratio=0, C=C))
-        ])
-    return pipeline
+def hyperparameter_selection(x_dev, x_train_df, y_train_df):
+    # Get text and target
+    y_labels = y_train_df['Coarse Label'].tolist()
+    y_dev = np.array(y_labels)
 
-#get text and target
-tr_list_of_text = x_train_df['text'].values.tolist()
-y_labels = y_train_df["Coarse Label"].tolist()
-x_train = x_train_df.drop(columns = ["author", "title" , "passage_id", "text"])
-
-RANDOM_SEED = 68
- 
-# Create a train/validation/test split
-X_dev, X_test, y_dev, y_test = sklearn.model_selection.train_test_split(
-    x_train, y_labels, test_size=0.15, random_state=RANDOM_SEED, stratify=y_labels
-)
-
-
-
-y_dev = np.array(y_dev)
-X_dev = np.array(X_dev)
-#Optimize C with cross validation 
-max_auc = 0
-best_c = 0
-kf = sklearn.model_selection.KFold(n_splits= 10, shuffle=True, random_state=RANDOM_SEED)
-for C in np.logspace(-4, 4, 17): 
-    for k in range(1,18):
+    max_auc, best_c = 0, 0
+    cat = x_train_df["author"].values
+    # Optimize C with cross validation 
+    kf = sklearn.model_selection.GroupKFold(n_splits=10, shuffle=True, random_state=RANDOM_SEED)
+    for c in np.logspace(-4, 4, 17):
         auc_sum = 0
-        for train_ind, val_ind in kf.split(X_dev, y_dev):
-            pipe = make_logit_pipeline_knnimpute(C=C, k=k)
-            pipe.fit(X_dev[train_ind], y_dev[train_ind])
-            y_hat = pipe.predict_proba(X_dev[val_ind])[:, 1]
+        pipe = make_mlp_pipeline(layers=[4, 4], activation='relu', solver='adam', alpha=c, batch_size=64, learning_rate='invscaling')
+        for train_ind, val_ind in kf.split(x_dev, y_dev, cat):
+            pipe.fit(x_dev[train_ind], y_dev[train_ind])
+            y_hat = pipe.predict_proba(x_dev[val_ind])[:, 1]
             auc = sklearn.metrics.roc_auc_score(y_dev[val_ind], y_hat)
-            auc_sum+=auc
-            print(auc)
-        avg_auc = auc_sum/10
-        if avg_auc == max_auc:
-                if C < best_c:
-                    best_c = C
-                    max_auc = avg_auc
+            auc_sum += auc
+        avg_auc = auc_sum / 10
 
+        print(f"AUC {avg_auc:.6f} c {c:e}")
+
+        # Prioritize a lower c value
         if avg_auc > max_auc:
-            best_c = C
-            max_auc = avg_auc
+            best_c, max_auc = c, avg_auc
 
-print ("Best C:", best_c)
-print ("Best AUC:", max_auc)
+    print("Best AUC:", max_auc)
+    print("Best C:", best_c)
 
-pipe = make_logit_pipeline_knnimpute(C= best_c)
+    return best_c
+
+def test_prediction(x_train_df, y_train_df, x_test_df, c, num_feats, max_df, min_df, ngram):
+    tr_list_of_text = x_train_df['text'].values.tolist()
+    y_labels = y_train_df['Coarse Label'].tolist()
+    test_list_of_text = x_test_df['text'].values.tolist()
+
+    vectorizer = CountVectorizer(
+        lowercase=True,
+        token_pattern=r'\b[a-z]+\b',
+        stop_words='english',
+        min_df=min_df,
+        max_df=max_df,
+        max_features=num_feats,
+        ngram_range=ngram
+    )
+
+    print(pd.Series(y_labels).value_counts())
+    X_dev = vectorizer.fit_transform(tr_list_of_text)
+    pipe = sklearn.linear_model.LogisticRegression(solver="liblinear", penalty="l2", C=c)
+    pipe.fit(X_dev, y_labels)
+    X_test = vectorizer.transform(test_list_of_text)
+    y_hat = pipe.predict_proba(X_test)[:, 1]
+    np.savetxt('yproba1_test.txt', y_hat)
+    print("y_hat[:5]:", y_hat[:5])
+    print("Vocab size:", X_dev.shape)
+
+
+def main():
+    x_dev, x_train_df, y_train_df, x_test_df = load_data()
+    c = hyperparameter_selection(x_dev, x_train_df, y_train_df)
+    # test_prediction(x_train_df, y_train_df, x_test_df, c, num_feats, max_df, min_df, ngram)
+
+if __name__ == "__main__":
+    main()
