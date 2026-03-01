@@ -7,6 +7,7 @@ import sklearn.linear_model
 import sklearn.metrics
 import sklearn.model_selection
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.preprocessing import StandardScaler
 
 from matplotlib import pyplot as plt
 import seaborn as sns
@@ -16,6 +17,7 @@ import sklearn.pipeline
 import sklearn.preprocessing
 
 from load_BERT_embeddings import load_arr_from_npz
+
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -54,7 +56,6 @@ RANDOM_SEED = 68
 def make_mlp_pipeline(layers, activation, solver, alpha, batch_size, learning_rate):
     pipeline = sklearn.pipeline.Pipeline(
         steps= [
-            ('rescaler', sklearn.preprocessing.MinMaxScaler()),
             ('logit', sklearn.neural_network.MLPClassifier(hidden_layer_sizes=layers,
                                                            activation=activation,
                                                            solver=solver,
@@ -75,6 +76,9 @@ def load_data(metrics=[]):
     additional_train_features = np.asarray([x_train_df[metric] for metric in metrics]).T
     additional_test_features = np.asarray([x_test_df[metric] for metric in metrics]).T
     # stdscaler = sklearn.preprocessing.StandardScaler(copy=False, with_mean=True, with_std=True)
+    scaler = StandardScaler()
+    additional_train_features = scaler.fit_transform(additional_train_features)
+    additional_test_features = scaler.transform(additional_test_features)
 
     x_train = load_arr_from_npz(os.path.join(data_dir, 'x_train_BERT_embeddings.npz'))
 
@@ -145,3 +149,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
