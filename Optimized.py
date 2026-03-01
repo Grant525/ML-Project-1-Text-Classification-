@@ -66,21 +66,23 @@ def make_mlp_pipeline(layers, activation, solver, alpha, batch_size, learning_ra
     )
     return pipeline
 
-def load_data():
+def load_data(metrics=[]):
     data_dir = 'data_readinglevel'
-
-    # #get text and target
-    # tr_list_of_text = x_train_df['text'].values.tolist()
-    # y_labels = y_train_df["Coarse Label"].tolist()
-    # x_train = x_train_df.drop(columns = ["author", "title" , "passage_id", "text"])
-
     x_train_df = pd.read_csv(os.path.join(data_dir, 'x_train.csv'))
     y_train_df = pd.read_csv(os.path.join(data_dir, 'y_train.csv'))
+    x_test_df = pd.read_csv(os.path.join(data_dir, 'x_test.csv'))
 
-    x_train = load_arr_from_npz(os.path.join(
-        data_dir, 'x_train_BERT_embeddings.npz'))
+    additional_train_features = np.asarray([x_train_df[metric] for metric in metrics]).T
+    additional_test_features = np.asarray([x_test_df[metric] for metric in metrics]).T
+    # stdscaler = sklearn.preprocessing.StandardScaler(copy=False, with_mean=True, with_std=True)
+
+    x_train = load_arr_from_npz(os.path.join(data_dir, 'x_train_BERT_embeddings.npz'))
+
+    x_train = np.append(x_train, additional_train_features, axis=1)
 
     x_test = load_arr_from_npz(os.path.join( data_dir, 'x_test_BERT_embeddings.npz'))
+
+    x_test = np.append(x_test, additional_test_features, axis=1)
 
     return x_train, x_train_df, y_train_df, x_test
 
@@ -115,36 +117,31 @@ def hyperparameter_selection(x_dev, x_train_df, y_train_df):
 
     return best_c
 
-def test_prediction(x_train_df, y_train_df, x_test_df, c, num_feats, max_df, min_df, ngram):
-    tr_list_of_text = x_train_df['text'].values.tolist()
+def test_prediction(x_dev, x_train_df, y_train_df, x_test_df, c):
     y_labels = y_train_df['Coarse Label'].tolist()
-    test_list_of_text = x_test_df['text'].values.tolist()
 
-    vectorizer = CountVectorizer(
-        lowercase=True,
-        token_pattern=r'\b[a-z]+\b',
-        stop_words='english',
-        min_df=min_df,
-        max_df=max_df,
-        max_features=num_feats,
-        ngram_range=ngram
-    )
-
-    print(pd.Series(y_labels).value_counts())
-    X_dev = vectorizer.fit_transform(tr_list_of_text)
-    pipe = sklearn.linear_model.LogisticRegression(solver="liblinear", penalty="l2", C=c)
-    pipe.fit(X_dev, y_labels)
-    X_test = vectorizer.transform(test_list_of_text)
-    y_hat = pipe.predict_proba(X_test)[:, 1]
+    pipe = make_mlp_pipeline(layers=[4, 4], activation='relu', solver='adam', alpha=c, batch_size=64, learning_rate='invscaling')
+    pipe.fit(x_dev[train_ind], y_dev[train_ind])
+    y_hat = pipe.predict_proba(x_dev[val_ind])[:, 1]
     np.savetxt('yproba1_test.txt', y_hat)
     print("y_hat[:5]:", y_hat[:5])
-    print("Vocab size:", X_dev.shape)
 
 
 def main():
-    x_dev, x_train_df, y_train_df, x_test_df = load_data()
+    metrics = ['char_count', 'word_count',
+       'sentence_count', 'avg_word_length', 'avg_sentence_length',
+       'type_token_ratio', 'pronoun_freq', 'function_words_count',
+       'punctuation_frequency', 'sentiment_polarity', 'sentiment_subjectivity',
+       'readability_Kincaid', 'readability_ARI', 'readability_Coleman-Liau',
+       'readability_FleschReadingEase', 'readability_GunningFogIndex',
+       'readability_LIX', 'readability_SMOGIndex', 'readability_RIX',
+       'readability_DaleChallIndex', 'info_characters_per_word',
+       'info_syll_per_word', 'info_words_per_sentence',
+       'info_type_token_ratio', 'info_characters', 'info_syllables',
+       'info_words', 'info_wordtypes']
+    x_dev, x_train_df, y_train_df, x_test = load_data(metrics)
     c = hyperparameter_selection(x_dev, x_train_df, y_train_df)
-    # test_prediction(x_train_df, y_train_df, x_test_df, c, num_feats, max_df, min_df, ngram)
+    # test_prediction(x_dev, x_train_df, y_train_df, x_test, c)
 
 if __name__ == "__main__":
     main()
