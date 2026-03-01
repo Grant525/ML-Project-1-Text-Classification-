@@ -121,12 +121,12 @@ def hyperparameter_selection(x_dev, x_train_df, y_train_df):
 
     return best_c
 
-def test_prediction(x_dev, x_train_df, y_train_df, x_test_df, c):
+def test_prediction(x_dev, x_train_df, y_train_df, x_test, c):
     y_labels = y_train_df['Coarse Label'].tolist()
-
-    pipe = make_mlp_pipeline(layers=[4, 4], activation='relu', solver='adam', alpha=c, batch_size=64, learning_rate='invscaling')
-    pipe.fit(x_dev[train_ind], y_dev[train_ind])
-    y_hat = pipe.predict_proba(x_dev[val_ind])[:, 1]
+    y_dev = np.array(y_labels)
+    pipe = make_mlp_pipeline(layers=[4, 4], activation='relu', solver='adam', alpha=c, batch_size=64, learning_rate='sinvscaling')
+    pipe.fit(x_dev, y_dev)
+    y_hat = pipe.predict_proba(x_test)[:, 1]
     np.savetxt('yproba1_test.txt', y_hat)
     print("y_hat[:5]:", y_hat[:5])
 
@@ -145,7 +145,7 @@ def main():
        'info_words', 'info_wordtypes']
     x_dev, x_train_df, y_train_df, x_test = load_data(metrics)
     c = hyperparameter_selection(x_dev, x_train_df, y_train_df)
-    # test_prediction(x_dev, x_train_df, y_train_df, x_test, c)
+    #test_prediction(x_dev, x_train_df, y_train_df, x_test, 3.1622776601683795)
 
 if __name__ == "__main__":
     main()
