@@ -97,9 +97,10 @@ def hyperparameter_selection(x_dev, x_train_df, y_train_df):
     cat = x_train_df["author"].values
     # Optimize C with cross validation 
     kf = sklearn.model_selection.GroupKFold(n_splits=10, shuffle=True, random_state=RANDOM_SEED)
-    for layer in ([2, 2], [4, 4], [8, 8], [16, 16], [32, 32], [64, 64], [128, 128]):
+    # for layer in ([2, 2], [4, 4], [8, 8], [16, 16], [32, 32], [64, 64], [128, 128]):
+    for layer in ([16, 16], [32, 32]):
         for bs in [32, 64, 128]:
-            for c in np.logspace(-4, 4, 17)[0:-3]:
+            for c in np.logspace(-4, 4, 17)[0:-5]:
                 auc_sum = 0
                 pipe = make_mlp_pipeline(layers=layer, activation='relu', solver='adam', alpha=c, batch_size=bs, learning_rate='invscaling')
                 for train_ind, val_ind in kf.split(x_dev, y_dev, cat):
@@ -114,7 +115,11 @@ def hyperparameter_selection(x_dev, x_train_df, y_train_df):
                 # Prioritize a lower c value
                 if avg_auc > max_auc:
                     best_c, max_auc, best_bs, best_layer = c, avg_auc, bs, layer
-                    best_per_layer[str(layer)] = [best_c.item(), max_auc, best_bs, best_layer]
+                if str(layer) in best_per_layer.keys():
+                    if avg_auc > best_per_layer[str(layer)][0]:
+                        best_per_layer[str(layer)] = [max_auc, best_c.item(), best_bs]
+                else:
+                    best_per_layer[str(layer)] = [max_auc, best_c.item(), best_bs]
 
     print("-"*64)
     print("Best AUC:", max_auc)
@@ -134,6 +139,11 @@ def test_prediction(x_dev, y_train_df, x_test, c, bs, layer):
     y_hat = pipe.predict_proba(x_test)[:, 1]
     np.savetxt('yproba_minmax.txt', y_hat)
 
+# '[2, 2]': [0.31622776601683794, 0.7042195481927992, 32, [2, 2]],
+# '[4, 4]': [3.1622776601683795, 0.7727808871099182, 128, [4, 4]],
+# '[8, 8]': [3.1622776601683795, 0.7729369697170639, 128, [8, 8]],
+# '[16, 16]': [1.0, 0.7732375038973036, 64, [16, 16]],
+# '[32, 32]': [3.1622776601683795, 0.773644880570182, 128, [32, 32]]
 
 def main():
     metrics = ['char_count', 'word_count',
