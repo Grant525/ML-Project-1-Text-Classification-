@@ -97,9 +97,9 @@ def hyperparameter_selection(x_dev, x_train_df, y_train_df):
                             best_c, max_auc, best_bs, best_layer = c, avg_auc, bs, layer
                         if str(layer) in best_per_layer.keys():
                             if avg_auc > best_per_layer[str(layer)][0]:
-                                best_per_layer[str(layer)] = [max_auc, best_c.item(), best_bs]
+                                best_per_layer[str(layer)] = [avg_auc, c.item(), bs]
                         else:
-                            best_per_layer[str(layer)] = [max_auc, best_c.item(), best_bs]
+                            best_per_layer[str(layer)] = [avg_auc, c.item(), bs]
 
     print("-"*64)
     print("Best AUC:", max_auc)
