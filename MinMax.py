@@ -3,10 +3,8 @@ import numpy as np
 import pandas as pd
 import os
 
-import sklearn.linear_model
 import sklearn.metrics
 import sklearn.model_selection
-from sklearn.feature_extraction.text import CountVectorizer
 
 from matplotlib import pyplot as plt
 import seaborn as sns
@@ -22,21 +20,6 @@ warnings.filterwarnings('ignore')
 
 RANDOM_SEED = 68
 
-def make_mlp_pipeline(layers, activation, solver, alpha, batch_size, learning_rate, learning_rate_init):
-    pipeline = sklearn.pipeline.Pipeline(
-        steps= [
-            ('rescaler', sklearn.preprocessing.MinMaxScaler()),
-            ('logit', sklearn.neural_network.MLPClassifier(hidden_layer_sizes=layers,
-                                                           activation=activation,
-                                                           solver=solver,
-                                                           alpha=alpha,
-                                                           batch_size=batch_size,
-                                                           learning_rate=learning_rate,
-                                                           learning_rate_init=learning_rate_init
-            ))
-        ]
-    )
-    return pipeline
 
 def load_data(metrics=[]):
     data_dir = 'data_readinglevel'
@@ -59,6 +42,23 @@ def load_data(metrics=[]):
     return x_train, x_train_df, y_train_df, x_test
 
 
+def make_mlp_pipeline(layers, activation, solver, alpha, batch_size, learning_rate, learning_rate_init):
+    pipeline = sklearn.pipeline.Pipeline(
+        steps= [
+            ('rescaler', sklearn.preprocessing.MinMaxScaler()),
+            ('logit', sklearn.neural_network.MLPClassifier(hidden_layer_sizes=layers,
+                                                           activation=activation,
+                                                           solver=solver,
+                                                           alpha=alpha,
+                                                           batch_size=batch_size,
+                                                           learning_rate=learning_rate,
+                                                           learning_rate_init=learning_rate_init
+            ))
+        ]
+    )
+    return pipeline
+
+
 def hyperparameter_selection(x_dev, x_train_df, y_train_df):
     # Get text and target
     y_labels = y_train_df['Coarse Label'].tolist()
@@ -67,7 +67,7 @@ def hyperparameter_selection(x_dev, x_train_df, y_train_df):
     max_auc, best_c, best_bs, best_layer, best_lr, best_lr_init = 0, 0, 0, [], 0, 0
     best_per_layer = {}
     cat = x_train_df["author"].values
-    # Optimize C with cross validation 
+
     kf = sklearn.model_selection.GroupKFold(n_splits=10, shuffle=True, random_state=RANDOM_SEED)
     # for layer in ([2, 2], [4, 4], [8, 8], [16, 16], [32, 32], [64, 64], [128, 128]):
     for layer in ([16, 16], [32, 32]):
@@ -111,12 +111,18 @@ def hyperparameter_selection(x_dev, x_train_df, y_train_df):
     print("-"*64)
     print(best_per_layer)
 
-    return best_c, best_bs, best_layer, best_lr, best_lr_init, best_per_layer
+    return best_c, best_bs, best_layer, best_lr, best_lr_init
 
 def test_prediction(x_dev, y_train_df, x_test, c, bs, layer, lr, lr_init):
     y_labels = y_train_df['Coarse Label'].tolist()
     y_dev = np.array(y_labels)
-    pipe = make_mlp_pipeline(layers=layer, activation='relu', solver='adam', alpha=c, batch_size=bs, learning_rate='invscaling')
+    pipe = make_mlp_pipeline(layers=layer,
+                            activation='relu',
+                            solver='adam',
+                            alpha=c,
+                            batch_size=bs,
+                            learning_rate=lr,
+                            learning_rate_init=lr_init)
     pipe.fit(x_dev, y_dev)
     y_hat = pipe.predict_proba(x_test)[:, 1]
     np.savetxt('yproba_minmax.txt', y_hat)
@@ -140,7 +146,7 @@ def main():
        'info_type_token_ratio', 'info_characters', 'info_syllables',
        'info_words', 'info_wordtypes']
     x_dev, x_train_df, y_train_df, x_test = load_data(metrics)
-    c, bs, layer, lr, lr_init, best_per_layer = hyperparameter_selection(x_dev, x_train_df, y_train_df)
+    c, bs, layer, lr, lr_init = hyperparameter_selection(x_dev, x_train_df, y_train_df)
     test_prediction(x_dev, y_train_df, x_test, c, bs, layer, lr, lr_init)
 
 if __name__ == "__main__":
