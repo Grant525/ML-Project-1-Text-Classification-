@@ -36,11 +36,11 @@ def load_data(metrics=[]):
     x_test = np.append(x_test, additional_test_features, axis=1)
 
     scaler = StandardScaler()
-    x_train = scaler.fit_transform(x_train)
-    x_test = scaler.transform(x_test)
+    # x_train = scaler.fit_transform(x_train)
+    # x_test = scaler.transform(x_test)
 
-    # x_train = scaler.fit_transform(additional_train_features)
-    # x_test = scaler.transform(additional_test_features)
+    x_train = scaler.fit_transform(additional_train_features)
+    x_test = scaler.transform(additional_test_features)
 
     return x_train, x_train_df, y_train_df, x_test
 
@@ -133,6 +133,7 @@ def main():
         for metric_list in metric_combinations:
             x_dev, x_train_df, y_train_df, x_test = load_data(metrics)
             auc, p, k = hyperparameter_selection(x_dev, x_train_df, y_train_df)
+            print("Added features:", metric_list)
         
             if auc > max_auc:
                     best_combination, max_auc, best_p, best_k = metric_list, auc, p, k

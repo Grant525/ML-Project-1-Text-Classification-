@@ -94,7 +94,7 @@ def hyperparameter_selection(x_dev, x_train_df, y_train_df):
 
                         # Prioritize a lower c value
                         if avg_auc > max_auc:
-                            best_c, max_auc, best_bs, best_layer = c, avg_auc, bs, layer
+                            best_c, max_auc, best_bs, best_layer, best_lr, best_lr_init = c, avg_auc, bs, layer, lr, lr_init
                         if str(layer) in best_per_layer.keys():
                             if avg_auc > best_per_layer[str(layer)][0]:
                                 best_per_layer[str(layer)] = [avg_auc, c.item(), bs]
@@ -133,6 +133,8 @@ def test_prediction(x_dev, y_train_df, x_test, c, bs, layer, lr, lr_init):
 # '[16, 16]': [1.0, 0.7732375038973036, 64, [16, 16]],
 # '[32, 32]': [3.1622776601683795, 0.773644880570182, 128, [32, 32]]
 
+# [32, 32]: [0.7761984169969912, 0.0031622776601683794, 32, 'constant', 1e-5]
+
 def main():
     metrics = ['char_count', 'word_count',
        'sentence_count', 'avg_word_length', 'avg_sentence_length',
@@ -146,7 +148,8 @@ def main():
        'info_type_token_ratio', 'info_characters', 'info_syllables',
        'info_words', 'info_wordtypes']
     x_dev, x_train_df, y_train_df, x_test = load_data(metrics)
-    c, bs, layer, lr, lr_init = hyperparameter_selection(x_dev, x_train_df, y_train_df)
+    # c, bs, layer, lr, lr_init = hyperparameter_selection(x_dev, x_train_df, y_train_df)
+    c, bs, layer, lr, lr_init = [0.0031622776601683794, 32, [32, 32], 'constant', 1e-5]
     test_prediction(x_dev, y_train_df, x_test, c, bs, layer, lr, lr_init)
 
 if __name__ == "__main__":
