@@ -49,7 +49,8 @@ def make_knn_pipeline(k, p):
     pipeline = sklearn.pipeline.Pipeline(
         steps= [
             ('logit', sklearn.neighbors.KNeighborsClassifier(n_neighbors=k,
-                                                             p=p
+                                                             p=p,
+                                                             n_jobs=-1
             ))
         ]
     )
@@ -126,14 +127,40 @@ def main():
        'info_syll_per_word', 'info_words_per_sentence',
        'info_type_token_ratio', 'info_characters', 'info_syllables',
        'info_words', 'info_wordtypes']
+    basic = ['char_count', 'word_count',
+       'sentence_count', 'avg_word_length', 'avg_sentence_length',
+       'type_token_ratio', 'pronoun_freq', 'function_words_count',
+       'punctuation_frequency']
+    sentiment = ['sentiment_polarity', 'sentiment_subjectivity']
+    readability = ['readability_Kincaid', 'readability_ARI', 'readability_Coleman-Liau',
+       'readability_FleschReadingEase', 'readability_GunningFogIndex',
+       'readability_LIX', 'readability_SMOGIndex', 'readability_RIX',
+       'readability_DaleChallIndex']
+    info = ['info_characters_per_word',
+       'info_syll_per_word', 'info_words_per_sentence',
+       'info_type_token_ratio', 'info_characters', 'info_syllables',
+       'info_words', 'info_wordtypes']
+    full = [basic, sentiment, readability, info]
+
+    ################################################################
+    # Best metrics: ['char_count', 'word_count', 'sentence_count', 'avg_word_length', 'avg_sentence_length', 'type_token_ratio', 'pronoun_freq', 'function_words_count', 'punctuation_frequency', 'sentiment_polarity', 'sentiment_subjectivity']
+    # Best AUC: 0.743941904427874
+    # Best p: 1
+    # Best k: 275
+    ################################################################
+    
     metric_combinations = []
     best_combination, max_auc, best_p, best_k = [], 0, 0, 0
-    for r in range(len(metrics)):
-        metric_combinations = itertools.combinations(metrics, r)
-        for metric_list in metric_combinations:
-            x_dev, x_train_df, y_train_df, x_test = load_data(metrics)
+    for r in range(len(full)):
+        metric_combinations = itertools.combinations(full, r+1)
+        for metric_categories in metric_combinations:
+            metric_list = []
+            for cat in metric_categories:
+                metric_list += cat
+            x_dev, x_train_df, y_train_df, x_test = load_data(metric_list)
             auc, p, k = hyperparameter_selection(x_dev, x_train_df, y_train_df)
             print("Added features:", metric_list)
+            print("-"*64)
         
             if auc > max_auc:
                     best_combination, max_auc, best_p, best_k = metric_list, auc, p, k
