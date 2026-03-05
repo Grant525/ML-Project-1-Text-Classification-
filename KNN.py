@@ -36,11 +36,11 @@ def load_data(metrics=[]):
     x_test = np.append(x_test, additional_test_features, axis=1)
 
     scaler = StandardScaler()
-    # x_train = scaler.fit_transform(x_train)
-    # x_test = scaler.transform(x_test)
+    x_train = scaler.fit_transform(x_train)
+    x_test = scaler.transform(x_test)
 
-    x_train = scaler.fit_transform(additional_train_features)
-    x_test = scaler.transform(additional_test_features)
+    # x_train = scaler.fit_transform(additional_train_features)
+    # x_test = scaler.transform(additional_test_features)
 
     return x_train, x_train_df, y_train_df, x_test
 
@@ -69,7 +69,7 @@ def hyperparameter_selection(x_dev, x_train_df, y_train_df):
 
     kf = sklearn.model_selection.GroupKFold(n_splits=10, shuffle=True, random_state=RANDOM_SEED)
     for p in [1, 2]:
-        for k in np.linspace(175, 275, 50):
+        for k in np.linspace(150, 300, 150):
             k = int(k)
             auc_sum = 0
             pipe = make_knn_pipeline(k, p)
@@ -149,31 +149,38 @@ def main():
     # Best k: 275
     ################################################################
     
-    metric_combinations = []
-    best_combination, max_auc, best_p, best_k = [], 0, 0, 0
-    for r in range(len(full)):
-        metric_combinations = itertools.combinations(full, r+1)
-        for metric_categories in metric_combinations:
-            metric_list = []
-            for cat in metric_categories:
-                metric_list += cat
-            x_dev, x_train_df, y_train_df, x_test = load_data(metric_list)
-            auc, p, k = hyperparameter_selection(x_dev, x_train_df, y_train_df)
-            print("Added features:", metric_list)
-            print("-"*64)
+    # metric_combinations = []
+    # best_combination, max_auc, best_p, best_k = [], 0, 0, 0
+    # for r in range(len(full)):
+    #     metric_combinations = itertools.combinations(full, r+1)
+    #     for metric_categories in metric_combinations:
+    #         metric_list = []
+    #         for cat in metric_categories:
+    #             metric_list += cat
+    #         x_dev, x_train_df, y_train_df, x_test = load_data(metric_list)
+    #         auc, p, k = hyperparameter_selection(x_dev, x_train_df, y_train_df)
+    #         print("Added features:", metric_list)
+    #         print("-"*64)
         
-            if auc > max_auc:
-                    best_combination, max_auc, best_p, best_k = metric_list, auc, p, k
+    #         if auc > max_auc:
+    #                 best_combination, max_auc, best_p, best_k = metric_list, auc, p, k
 
-    print("#"*64)
-    print("Best metrics:", best_combination)
-    print("Best AUC:", max_auc)
-    print("Best p:", best_p)
-    print("Best k:", best_k)
-    print("#"*64)
+    # print("#"*64)
+    # print("Best metrics:", best_combination)
+    # print("Best AUC:", max_auc)
+    # print("Best p:", best_p)
+    # print("Best k:", best_k)
+    # print("#"*64)
 
-    x_dev, x_train_df, y_train_df, x_test = load_data(best_combination)
-    test_prediction(x_dev, y_train_df, x_test, best_p, best_k)
+    # x_dev, x_train_df, y_train_df, x_test = load_data(best_combination)
+    # test_prediction(x_dev, y_train_df, x_test, best_p, best_k)
+
+    # metric_list = basic + sentiment
+    metric_list = metrics
+    x_dev, x_train_df, y_train_df, x_test = load_data(metric_list)
+    _, p, k = hyperparameter_selection(x_dev, x_train_df, y_train_df)
+    test_prediction(x_dev, y_train_df, x_test, p, k)
+
 
 if __name__ == "__main__":
     main()
