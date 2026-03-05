@@ -43,7 +43,7 @@ class MyDataset(Dataset):
 # Best loss 0.558468222618103 with accuracy 0.7473021582733813
 # C(3, 1, 1, 8) -> C(3, 1, 8, 8) -> C(3, 1, 8, 8) -> MP(2, 2) -> Flatten -> D(512) -> D(2)
 
-# Best loss 0.5541490912437439 with accuracy 0.7410071942446043
+# Best loss 0.5541490912437439 with accuracy 0.7410071942446043 and auc 0.8183999451566463
 # C(3, 1, 1, 8) BN -> C(3, 1, 8, 8) BN -> C(3, 1, 8, 8) BN -> MP(2, 2) -> Flatten -> D(512) -> D(2)
 
 class CNN(nn.Module):
@@ -94,10 +94,12 @@ def train(x_train, y_train, x_val, y_val, model, num_train_epochs, batch_size, l
 
     history = {"loss": [],
               "val_loss": [],
-              "accuracy": []}
+              "accuracy": [],
+              "auc": []}
 
     best_val_loss = float('inf')
     best_accuracy = 0
+    best_auc = 0
 
     for epoch in range(num_train_epochs):
         epoch_loss = 0
@@ -124,27 +126,30 @@ def train(x_train, y_train, x_val, y_val, model, num_train_epochs, batch_size, l
                 val_loss = loss_func(preds, labels).detach()
 
                 accuracy = sklearn.metrics.accuracy_score(labels.numpy(), torch.argmax(preds, dim=1).numpy())
+                auc = sklearn.metrics.roc_auc_score(labels.numpy(), preds[:, 1])
 
                 history['loss'].append(epoch_loss / (y_train.shape[0] / batch_size))
                 history['val_loss'].append(val_loss)
                 history['accuracy'].append(accuracy)
+                history['auc'].append(auc)
 
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
                     best_accuracy = accuracy
+                    best_auc = auc
                     torch.save(model.state_dict(), "cnn.pt")
 
                 # Early stopping
                 if len(history['val_loss']) >= 30:
                     last30 = history['val_loss'][-30:]
                     if best_val_loss not in last30:
-                        print(f"Best loss {best_val_loss} with accuracy {best_accuracy}")
+                        print(f"Best loss {best_val_loss} with accuracy {best_accuracy} and auc {best_auc}")
                         return history
 
         if epoch == 0:
-            print(f"Epoch [1/{num_train_epochs}], Train Loss: {history['loss'][epoch]:.4f}, Val Loss: {history['val_loss'][epoch]:.4f}, Acc Score: {history['accuracy'][epoch]:.4f}")
+            print(f"Epoch [1/{num_train_epochs}], Train Loss: {history['loss'][epoch]:.4f}, Val Loss: {history['val_loss'][epoch]:.4f}, Acc Score: {history['accuracy'][epoch]:.4f}, AUC: {history['auc'][epoch]:.4f}")
         if (epoch + 1) % 10 == 0:
-            print(f"Epoch [{epoch + 1}/{num_train_epochs}], Train Loss: {history['loss'][epoch]:.4f}, Val Loss: {history['val_loss'][epoch]:.4f}, Acc Score: {history['accuracy'][epoch]:.4f}")
+            print(f"Epoch [{epoch + 1}/{num_train_epochs}], Train Loss: {history['loss'][epoch]:.4f}, Val Loss: {history['val_loss'][epoch]:.4f}, Acc Score: {history['accuracy'][epoch]:.4f}, AUC: {history['auc'][epoch]:.4f}")
 
     return history
 
