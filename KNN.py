@@ -181,6 +181,13 @@ def main():
     _, p, k = hyperparameter_selection(x_dev, x_train_df, y_train_df)
     test_prediction(x_dev, y_train_df, x_test, p, k)
 
+# ----------------------------------------------------------------
+# Best AUC: 0.7735294743372317
+# Best p: 1
+# Best k: 237
+# ----------------------------------------------------------------
+# Best per p {'1': [0.7735294743372317, 237], '2': [0.7720302445343747, 266]}
+
 
 if __name__ == "__main__":
     main()
