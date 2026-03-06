@@ -17,9 +17,16 @@ import sklearn.pipeline
 import sklearn.preprocessing
 
 from load_BERT_embeddings import load_arr_from_npz
-
-
 import warnings
+from datasets import DatasetDict, Dataset
+from transformers import AutoTokenizer,  AutoModelForSequenceClassification, TrainingArguments, Trainer
+import evaluate 
+from transformers import DataCollatorWithPadding
+from scipy.special import softmax
+
+
+
+
 warnings.filterwarnings('ignore')
 
 RANDOM_SEED = 68
@@ -53,6 +60,7 @@ RANDOM_SEED = 68
 #         print('\n'.join(line_list))
 #         print("")
 
+
 def make_mlp_pipeline(layers, activation, solver, alpha, batch_size, learning_rate):
     pipeline = sklearn.pipeline.Pipeline(
         steps= [
@@ -82,11 +90,11 @@ def load_data(metrics=[]):
 
     x_train = load_arr_from_npz(os.path.join(data_dir, 'x_train_BERT_embeddings.npz'))
 
-    x_train = np.append(x_train, additional_train_features, axis=1)
+    #x_train = np.append(x_train, additional_train_features, axis=1)
 
     x_test = load_arr_from_npz(os.path.join( data_dir, 'x_test_BERT_embeddings.npz'))
 
-    x_test = np.append(x_test, additional_test_features, axis=1)
+    #x_test = np.append(x_test, additional_test_features, axis=1)
 
     return x_train, x_train_df, y_train_df, x_test
 
@@ -96,25 +104,27 @@ def hyperparameter_selection(x_dev, x_train_df, y_train_df):
     y_labels = y_train_df['Coarse Label'].tolist()
     y_dev = np.array(y_labels)
 
-    max_auc, best_c = 0, 0
+    max_auc, best_c, bi, by = 0, 0, 0, 0 
     cat = x_train_df["author"].values
     # Optimize C with cross validation 
     kf = sklearn.model_selection.GroupKFold(n_splits=10, shuffle=True, random_state=RANDOM_SEED)
-    for c in np.logspace(-4, 4, 17):
-        auc_sum = 0
-        pipe = make_mlp_pipeline(layers=[4, 4], activation='relu', solver='adam', alpha=c, batch_size=64, learning_rate='invscaling')
-        for train_ind, val_ind in kf.split(x_dev, y_dev, cat):
-            pipe.fit(x_dev[train_ind], y_dev[train_ind])
-            y_hat = pipe.predict_proba(x_dev[val_ind])[:, 1]
-            auc = sklearn.metrics.roc_auc_score(y_dev[val_ind], y_hat)
-            auc_sum += auc
-        avg_auc = auc_sum / 10
+    for i in [64, 128, 256, 512]:
+        for y in [6, 7, 8, 9]:
+            for c in np.logspace(-1, 1, 5):
+                auc_sum = 0
+                pipe = make_mlp_pipeline(layers=[i, y], activation='relu', solver='adam', alpha=c, batch_size=64, learning_rate='constant')
+                for train_ind, val_ind in kf.split(x_dev, y_dev, cat):
+                    pipe.fit(x_dev[train_ind], y_dev[train_ind])
+                    y_hat = pipe.predict_proba(x_dev[val_ind])[:, 1]
+                    auc = sklearn.metrics.roc_auc_score(y_dev[val_ind], y_hat)
+                    auc_sum += auc
+                avg_auc = auc_sum / 10
 
-        print(f"AUC {avg_auc:.6f} c {c:e}")
+                print(f"AUC {avg_auc:.6f} c {c:e} Layer size {i} layer # {y}")
 
-        # Prioritize a lower c value
-        if avg_auc > max_auc:
-            best_c, max_auc = c, avg_auc
+                # Prioritize a lower c value
+                if avg_auc > max_auc:
+                    best_c, max_auc, bi, by = c, avg_auc, i, y
 
     print("Best AUC:", max_auc)
     print("Best C:", best_c)
@@ -124,7 +134,7 @@ def hyperparameter_selection(x_dev, x_train_df, y_train_df):
 def test_prediction(x_dev, x_train_df, y_train_df, x_test, c):
     y_labels = y_train_df['Coarse Label'].tolist()
     y_dev = np.array(y_labels)
-    pipe = make_mlp_pipeline(layers=[4, 4], activation='relu', solver='adam', alpha=c, batch_size=64, learning_rate='sinvscaling')
+    pipe = make_mlp_pipeline(layers=[4, 4], activation='relu', solver='adam', alpha=c, batch_size=64, learning_rate='invscaling')
     pipe.fit(x_dev, y_dev)
     y_hat = pipe.predict_proba(x_test)[:, 1]
     np.savetxt('yproba1_test.txt', y_hat)
@@ -145,6 +155,7 @@ def main():
        'info_words', 'info_wordtypes']
     x_dev, x_train_df, y_train_df, x_test = load_data(metrics)
     c = hyperparameter_selection(x_dev, x_train_df, y_train_df)
+    fine_tune_bert(x_train_df, y_train_df, x_test)
     #test_prediction(x_dev, x_train_df, y_train_df, x_test, 3.1622776601683795)
 
 if __name__ == "__main__":
